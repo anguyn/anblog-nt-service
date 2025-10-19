@@ -11,7 +11,7 @@ export class SocketService {
      * Emit to multiple users
      */
     static emitToUsers(userIds, event, data) {
-        userIds.forEach(userId => {
+        userIds.forEach((userId) => {
             io.to(`user:${userId}`).emit(event, data);
         });
     }

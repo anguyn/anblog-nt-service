@@ -9,7 +9,7 @@ export function setupNotificationHandlers(socket) {
             // Acknowledge back to client
             socket.emit(SOCKET_EVENTS.NOTIFICATION_READ, {
                 success: true,
-                notificationId
+                notificationId,
             });
         }
         catch (error) {
