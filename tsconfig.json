@@ -1,0 +1,80 @@
+{
+  // Visit https://aka.ms/tsconfig to read more about this file
+  "compilerOptions": {
+    // File Layout
+    // "rootDir": "./src",
+    // "outDir": "./dist",
+
+    // Environment Settings
+    // See also https://aka.ms/tsconfig/module
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+
+    // For nodejs:
+    // "lib": ["esnext"],
+    // "types": ["node"],
+    // and npm install -D @types/node
+
+    // Other Outputs
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+
+    // Stricter Typechecking Options
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    // Style Options
+    // "noImplicitReturns": true,
+    // "noImplicitOverride": true,
+    // "noUnusedLocals": true,
+    // "noUnusedParameters": true,
+    // "noFallthroughCasesInSwitch": true,
+    // "noPropertyAccessFromIndexSignature": true,
+
+    // Recommended Options
+    "strict": true,
+    "jsx": "react-jsx",
+    // "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "#src/*": ["./src/*"],
+      "#config/*": ["./src/config/*"],
+      "#templates/*": ["./src/templates/*"],
+      "#controllers/*": ["./src/controllers/*"],
+      "#middlewares/*": ["./src/middlewares/*"],
+      "#schemas/*": ["./src/schemas/*"],
+      "#jobs/*": ["./src/jobs/*"],
+      "#workers/*": ["./src/workers/*"],
+      "#queues/*": ["./src/queues/*"],
+      "#routes/*": ["./src/routes/*"],
+      "#services/*": ["./src/services/*"],
+      "#lib/*": ["./src/lib/*"],
+      "#cron/*": ["./src/cron/*"],
+      "#monitoring/*": ["./src/monitoring/*"],
+      "#docs/*": ["./src/docs/*"],
+      "#sockets/*": ["./src/sockets/*"]
+    },
+  },
+  "ts-node": {
+      "require": ["tsconfig-paths/register"]
+  },
+  "include": [
+      "src/**/*",
+      "src/**/*.ts",
+      "src/**/*.d.ts",
+      "src/types/**/*.d.ts",
+  ],
+  "exclude": ["node_modules"]
+}

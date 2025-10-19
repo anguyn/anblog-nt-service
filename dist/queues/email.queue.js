@@ -1,0 +1,34 @@
+import { Queue } from 'bullmq';
+import { redis } from '#lib/redis';
+// Priority levels
+export var EmailPriority;
+(function (EmailPriority) {
+    EmailPriority[EmailPriority["CRITICAL"] = 1] = "CRITICAL";
+    EmailPriority[EmailPriority["HIGH"] = 5] = "HIGH";
+    EmailPriority[EmailPriority["NORMAL"] = 10] = "NORMAL";
+    EmailPriority[EmailPriority["LOW"] = 15] = "LOW";
+})(EmailPriority || (EmailPriority = {}));
+export const emailQueue = new Queue('email', {
+    connection: redis,
+    defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+            type: 'exponential',
+            delay: 2000,
+        },
+        removeOnComplete: {
+            age: 24 * 3600,
+            count: 1000,
+        },
+        removeOnFail: {
+            age: 7 * 24 * 3600,
+        },
+    },
+});
+export async function addEmailJob(data, priority = EmailPriority.NORMAL) {
+    return emailQueue.add('send-email', data, {
+        priority,
+        ...(priority === EmailPriority.CRITICAL && { delay: 0 }),
+    });
+}
+//# sourceMappingURL=email.queue.js.map
