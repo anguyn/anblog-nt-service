@@ -1,15 +1,19 @@
-import { Queue } from 'bullmq';
-import { redis } from '#lib/redis';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.emailQueue = exports.EmailPriority = void 0;
+exports.addEmailJob = addEmailJob;
+const bullmq_1 = require("bullmq");
+const redis_1 = require("../lib/redis");
 // Priority levels
-export var EmailPriority;
+var EmailPriority;
 (function (EmailPriority) {
     EmailPriority[EmailPriority["CRITICAL"] = 1] = "CRITICAL";
     EmailPriority[EmailPriority["HIGH"] = 5] = "HIGH";
     EmailPriority[EmailPriority["NORMAL"] = 10] = "NORMAL";
     EmailPriority[EmailPriority["LOW"] = 15] = "LOW";
-})(EmailPriority || (EmailPriority = {}));
-export const emailQueue = new Queue('email', {
-    connection: redis,
+})(EmailPriority || (exports.EmailPriority = EmailPriority = {}));
+exports.emailQueue = new bullmq_1.Queue('email', {
+    connection: redis_1.redis,
     defaultJobOptions: {
         attempts: 3,
         backoff: {
@@ -25,8 +29,8 @@ export const emailQueue = new Queue('email', {
         },
     },
 });
-export async function addEmailJob(data, priority = EmailPriority.NORMAL) {
-    return emailQueue.add('send-email', data, {
+async function addEmailJob(data, priority = EmailPriority.NORMAL) {
+    return exports.emailQueue.add('send-email', data, {
         priority,
         ...(priority === EmailPriority.CRITICAL && { delay: 0 }),
     });

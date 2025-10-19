@@ -1,18 +1,24 @@
-import { redis } from './redis';
-import { config } from '../config';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.canResendVerificationEmail = canResendVerificationEmail;
+exports.canResendPasswordReset = canResendPasswordReset;
+exports.checkEmailRateLimit = checkEmailRateLimit;
+exports.formatRetryAfter = formatRetryAfter;
+const redis_1 = require("./redis");
+const config_1 = require("../config");
 /**
  * Check if user can resend verification email
  * Config: RATE_LIMIT_VERIFICATION_RESEND (default: 5m)
  * Config: RATE_LIMIT_MAX_VERIFICATION_PER_HOUR (default: 3)
  */
-export async function canResendVerificationEmail(email) {
+async function canResendVerificationEmail(email) {
     const cooldownKey = `rate_limit:verification:cooldown:${email}`;
     const hourlyKey = `rate_limit:verification:hourly:${email}`;
     // Check cooldown (minimum time between resends)
-    const lastSent = await redis.get(cooldownKey);
+    const lastSent = await redis_1.redis.get(cooldownKey);
     if (lastSent) {
         const timeSinceLastSend = Date.now() - parseInt(lastSent);
-        const cooldown = config.rateLimit.verificationResend;
+        const cooldown = config_1.config.rateLimit.verificationResend;
         if (timeSinceLastSend < cooldown) {
             return {
                 allowed: false,
@@ -23,10 +29,10 @@ export async function canResendVerificationEmail(email) {
         }
     }
     // Check hourly limit
-    const hourlyCount = await redis.get(hourlyKey);
-    const maxPerHour = config.rateLimit.maxVerificationPerHour;
+    const hourlyCount = await redis_1.redis.get(hourlyKey);
+    const maxPerHour = config_1.config.rateLimit.maxVerificationPerHour;
     if (hourlyCount && parseInt(hourlyCount) >= maxPerHour) {
-        const ttl = await redis.ttl(hourlyKey);
+        const ttl = await redis_1.redis.ttl(hourlyKey);
         return {
             allowed: false,
             remaining: 0,
@@ -36,10 +42,10 @@ export async function canResendVerificationEmail(email) {
     }
     // Allow and update counters
     const now = Date.now();
-    await redis.set(cooldownKey, now.toString(), 'PX', config.rateLimit.verificationResend);
-    const newCount = await redis.incr(hourlyKey);
+    await redis_1.redis.set(cooldownKey, now.toString(), 'PX', config_1.config.rateLimit.verificationResend);
+    const newCount = await redis_1.redis.incr(hourlyKey);
     if (newCount === 1) {
-        await redis.expire(hourlyKey, 3600); // 1 hour
+        await redis_1.redis.expire(hourlyKey, 3600); // 1 hour
     }
     return {
         allowed: true,
@@ -52,13 +58,13 @@ export async function canResendVerificationEmail(email) {
  * Config: RATE_LIMIT_PASSWORD_RESET_RESEND (default: 5m)
  * Config: RATE_LIMIT_MAX_PASSWORD_RESET_PER_HOUR (default: 3)
  */
-export async function canResendPasswordReset(email) {
+async function canResendPasswordReset(email) {
     const cooldownKey = `rate_limit:password_reset:cooldown:${email}`;
     const hourlyKey = `rate_limit:password_reset:hourly:${email}`;
-    const lastSent = await redis.get(cooldownKey);
+    const lastSent = await redis_1.redis.get(cooldownKey);
     if (lastSent) {
         const timeSinceLastSend = Date.now() - parseInt(lastSent);
-        const cooldown = config.rateLimit.passwordResetResend;
+        const cooldown = config_1.config.rateLimit.passwordResetResend;
         if (timeSinceLastSend < cooldown) {
             return {
                 allowed: false,
@@ -68,10 +74,10 @@ export async function canResendPasswordReset(email) {
             };
         }
     }
-    const hourlyCount = await redis.get(hourlyKey);
-    const maxPerHour = config.rateLimit.maxPasswordResetPerHour;
+    const hourlyCount = await redis_1.redis.get(hourlyKey);
+    const maxPerHour = config_1.config.rateLimit.maxPasswordResetPerHour;
     if (hourlyCount && parseInt(hourlyCount) >= maxPerHour) {
-        const ttl = await redis.ttl(hourlyKey);
+        const ttl = await redis_1.redis.ttl(hourlyKey);
         return {
             allowed: false,
             remaining: 0,
@@ -80,10 +86,10 @@ export async function canResendPasswordReset(email) {
         };
     }
     const now = Date.now();
-    await redis.set(cooldownKey, now.toString(), 'PX', config.rateLimit.passwordResetResend);
-    const newCount = await redis.incr(hourlyKey);
+    await redis_1.redis.set(cooldownKey, now.toString(), 'PX', config_1.config.rateLimit.passwordResetResend);
+    const newCount = await redis_1.redis.incr(hourlyKey);
     if (newCount === 1) {
-        await redis.expire(hourlyKey, 3600);
+        await redis_1.redis.expire(hourlyKey, 3600);
     }
     return {
         allowed: true,
@@ -95,15 +101,15 @@ export async function canResendPasswordReset(email) {
  * General email rate limiter per user
  * Config: RATE_LIMIT_MAX_EMAILS_PER_USER_PER_MINUTE (default: 10)
  */
-export async function checkEmailRateLimit(userId) {
+async function checkEmailRateLimit(userId) {
     const key = `rate_limit:email:user:${userId}`;
-    const limit = config.rateLimit.maxEmailsPerUserPerMinute;
+    const limit = config_1.config.rateLimit.maxEmailsPerUserPerMinute;
     const window = 60; // 60 seconds
-    const count = await redis.incr(key);
+    const count = await redis_1.redis.incr(key);
     if (count === 1) {
-        await redis.expire(key, window);
+        await redis_1.redis.expire(key, window);
     }
-    const ttl = await redis.ttl(key);
+    const ttl = await redis_1.redis.ttl(key);
     if (count > limit) {
         return {
             allowed: false,
@@ -121,7 +127,7 @@ export async function checkEmailRateLimit(userId) {
 /**
  * Format retry time in human readable format
  */
-export function formatRetryAfter(milliseconds) {
+function formatRetryAfter(milliseconds) {
     const seconds = Math.ceil(milliseconds / 1000);
     if (seconds < 60) {
         return `${seconds} giây`;

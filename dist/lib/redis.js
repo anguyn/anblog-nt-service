@@ -1,17 +1,20 @@
-import { Redis } from 'ioredis';
-import { config } from '../config';
-export const redis = config.redis.url
-    ? new Redis(config.redis.url, {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.redis = void 0;
+const ioredis_1 = require("ioredis");
+const config_1 = require("../config");
+exports.redis = config_1.config.redis.url
+    ? new ioredis_1.Redis(config_1.config.redis.url, {
         maxRetriesPerRequest: null,
-        ...(config.redis.url.startsWith('rediss://') && { tls: {} }), // Chỉ thêm khi cần
+        ...(config_1.config.redis.url.startsWith('rediss://') && { tls: {} }), // Chỉ thêm khi cần
     })
-    : new Redis({
-        host: config.redis.host,
-        port: config.redis.port,
-        ...(config.redis.password && { password: config.redis.password }),
+    : new ioredis_1.Redis({
+        host: config_1.config.redis.host,
+        port: config_1.config.redis.port,
+        ...(config_1.config.redis.password && { password: config_1.config.redis.password }),
         maxRetriesPerRequest: null,
-        ...(config.redis.url?.startsWith('rediss://') && { tls: {} }), // Chỉ thêm khi cần
+        ...(config_1.config.redis.url?.startsWith('rediss://') && { tls: {} }), // Chỉ thêm khi cần
     });
-redis.on('error', (err) => console.error('Redis error:', err));
-redis.on('connect', () => console.log('✅ Redis connected'));
+exports.redis.on('error', (err) => console.error('Redis error:', err));
+exports.redis.on('connect', () => console.log('✅ Redis connected'));
 //# sourceMappingURL=redis.js.map

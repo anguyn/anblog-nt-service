@@ -1,7 +1,9 @@
-import { Router } from 'express';
-import { SocketService } from '#services/socket.service';
-import { SOCKET_EVENTS } from '#sockets/events';
-const router = Router();
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const socket_service_1 = require("../services/socket.service");
+const events_1 = require("../sockets/events");
+const router = (0, express_1.Router)();
 /**
  * POST /api/socket/test
  * Test sending notification via socket
@@ -13,7 +15,7 @@ router.post('/test', async (req, res) => {
             return res.status(400).json({ error: 'userId is required' });
         }
         // Send test notification
-        SocketService.sendNotification(userId, {
+        socket_service_1.SocketService.sendNotification(userId, {
             id: `test-${Date.now()}`,
             type: 'test',
             title: 'Test Notification',
@@ -38,7 +40,7 @@ router.post('/test', async (req, res) => {
 router.post('/broadcast', async (req, res) => {
     try {
         const { message } = req.body;
-        SocketService.broadcast(SOCKET_EVENTS.SYSTEM_MESSAGE, {
+        socket_service_1.SocketService.broadcast(events_1.SOCKET_EVENTS.SYSTEM_MESSAGE, {
             message: message || 'System broadcast',
             timestamp: new Date().toISOString(),
         });
@@ -48,5 +50,5 @@ router.post('/broadcast', async (req, res) => {
         res.status(500).json({ error: 'Failed to broadcast' });
     }
 });
-export default router;
+exports.default = router;
 //# sourceMappingURL=socket.routes.js.map

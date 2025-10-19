@@ -1,10 +1,14 @@
-import { Resend } from 'resend';
-import { config } from '../config';
-export const resend = new Resend(config.email.resendApiKey);
-export async function sendEmail({ to, subject, html, text }) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.resend = void 0;
+exports.sendEmail = sendEmail;
+const resend_1 = require("resend");
+const config_1 = require("../config");
+exports.resend = new resend_1.Resend(config_1.config.email.resendApiKey);
+async function sendEmail({ to, subject, html, text }) {
     try {
-        const result = await resend.emails.send({
-            from: `${config.email.from.name} <${config.email.from.email}>`,
+        const result = await exports.resend.emails.send({
+            from: `${config_1.config.email.from.name} <${config_1.config.email.from.email}>`,
             to: Array.isArray(to) ? to : [to],
             subject,
             html,

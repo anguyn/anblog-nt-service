@@ -1,4 +1,11 @@
-export function renderEmailTemplate(template, data) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.renderEmailTemplate = renderEmailTemplate;
+exports.verifyEmailTemplate = verifyEmailTemplate;
+exports.passwordResetTemplate = passwordResetTemplate;
+exports.welcomeTemplate = welcomeTemplate;
+exports.newPostNotificationTemplate = newPostNotificationTemplate;
+function renderEmailTemplate(template, data) {
     const templates = {
         'verify-email': verifyEmailTemplate,
         'password-reset': passwordResetTemplate,
@@ -209,5 +216,4 @@ function newPostNotificationTemplate(data) {
     const text = `${isVietnamese ? 'Bài viết mới' : 'New post'}: ${data.postTitle}\n\n${data.postExcerpt}\n\n${data.postUrl}`;
     return { html, text };
 }
-export { verifyEmailTemplate, passwordResetTemplate, welcomeTemplate, newPostNotificationTemplate };
 //# sourceMappingURL=index.js.map

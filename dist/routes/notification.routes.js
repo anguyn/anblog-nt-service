@@ -1,14 +1,16 @@
-import { Router } from 'express';
-import { redis } from '#lib/redis';
-import { emailQueue } from '#queues/email.queue';
-import { notificationQueue } from '#queues/notification.queue';
-const router = Router();
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const redis_1 = require("../lib/redis");
+const email_queue_1 = require("../queues/email.queue");
+const notification_queue_1 = require("../queues/notification.queue");
+const router = (0, express_1.Router)();
 router.get('/', async (req, res) => {
     try {
-        const redisStatus = await redis.ping();
+        const redisStatus = await redis_1.redis.ping();
         const [emailCounts, notificationCounts] = await Promise.all([
-            emailQueue.getJobCounts(),
-            notificationQueue.getJobCounts(),
+            email_queue_1.emailQueue.getJobCounts(),
+            notification_queue_1.notificationQueue.getJobCounts(),
         ]);
         res.json({
             status: 'healthy',
@@ -28,5 +30,5 @@ router.get('/', async (req, res) => {
         });
     }
 });
-export default router;
+exports.default = router;
 //# sourceMappingURL=notification.routes.js.map

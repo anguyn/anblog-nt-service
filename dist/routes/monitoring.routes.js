@@ -1,7 +1,9 @@
-import { Router } from 'express';
-import { emailQueue } from '#queues/email.queue';
-import { notificationQueue } from '#queues/notification.queue';
-const router = Router();
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const email_queue_1 = require("../queues/email.queue");
+const notification_queue_1 = require("../queues/notification.queue");
+const router = (0, express_1.Router)();
 /**
  * GET /api/monitoring/stats
  * Tổng quan về queues
@@ -9,13 +11,13 @@ const router = Router();
 router.get('/stats', async (req, res) => {
     try {
         const [emailCounts, notificationCounts] = await Promise.all([
-            emailQueue.getJobCounts(),
-            notificationQueue.getJobCounts(),
+            email_queue_1.emailQueue.getJobCounts(),
+            notification_queue_1.notificationQueue.getJobCounts(),
         ]);
         // Get workers status
         const [emailWorkers, notificationWorkers] = await Promise.all([
-            emailQueue.getWorkers(),
-            notificationQueue.getWorkers(),
+            email_queue_1.emailQueue.getWorkers(),
+            notification_queue_1.notificationQueue.getWorkers(),
         ]);
         res.json({
             timestamp: new Date().toISOString(),
@@ -51,11 +53,11 @@ router.get('/jobs/failed', async (req, res) => {
         const limit = parseInt(req.query.limit) || 50;
         let jobs = [];
         if (queue === 'email' || !queue) {
-            const emailJobs = await emailQueue.getFailed(0, limit);
+            const emailJobs = await email_queue_1.emailQueue.getFailed(0, limit);
             jobs = [...jobs, ...emailJobs];
         }
         if (queue === 'notification' || !queue) {
-            const notificationJobs = await notificationQueue.getFailed(0, limit);
+            const notificationJobs = await notification_queue_1.notificationQueue.getFailed(0, limit);
             jobs = [...jobs, ...notificationJobs];
         }
         const jobsData = jobs.map((job) => ({
@@ -89,11 +91,11 @@ router.get('/jobs/waiting', async (req, res) => {
         const limit = parseInt(req.query.limit) || 50;
         let jobs = [];
         if (queue === 'email' || !queue) {
-            const emailJobs = await emailQueue.getWaiting(0, limit);
+            const emailJobs = await email_queue_1.emailQueue.getWaiting(0, limit);
             jobs = [...jobs, ...emailJobs];
         }
         if (queue === 'notification' || !queue) {
-            const notificationJobs = await notificationQueue.getWaiting(0, limit);
+            const notificationJobs = await notification_queue_1.notificationQueue.getWaiting(0, limit);
             jobs = [...jobs, ...notificationJobs];
         }
         const jobsData = jobs.map((job) => ({
@@ -123,10 +125,10 @@ router.post('/jobs/:jobId/retry', async (req, res) => {
         const { queue } = req.body;
         let job;
         if (queue === 'email') {
-            job = await emailQueue.getJob(jobId);
+            job = await email_queue_1.emailQueue.getJob(jobId);
         }
         else if (queue === 'notification') {
-            job = await notificationQueue.getJob(jobId);
+            job = await notification_queue_1.notificationQueue.getJob(jobId);
         }
         if (!job) {
             return res.status(404).json({ error: 'Job not found' });
@@ -151,14 +153,14 @@ router.post('/jobs/retry-failed', async (req, res) => {
         const { queue, limit = 100 } = req.body;
         let retriedCount = 0;
         if (queue === 'email' || !queue) {
-            const emailJobs = await emailQueue.getFailed(0, limit);
+            const emailJobs = await email_queue_1.emailQueue.getFailed(0, limit);
             for (const job of emailJobs) {
                 await job.retry();
                 retriedCount++;
             }
         }
         if (queue === 'notification' || !queue) {
-            const notificationJobs = await notificationQueue.getFailed(0, limit);
+            const notificationJobs = await notification_queue_1.notificationQueue.getFailed(0, limit);
             for (const job of notificationJobs) {
                 await job.retry();
                 retriedCount++;
@@ -184,10 +186,10 @@ router.delete('/jobs/:jobId', async (req, res) => {
         const { queue } = req.query;
         let job;
         if (queue === 'email') {
-            job = await emailQueue.getJob(jobId);
+            job = await email_queue_1.emailQueue.getJob(jobId);
         }
         else if (queue === 'notification') {
-            job = await notificationQueue.getJob(jobId);
+            job = await notification_queue_1.notificationQueue.getJob(jobId);
         }
         if (!job) {
             return res.status(404).json({ error: 'Job not found' });
@@ -211,11 +213,11 @@ router.post('/jobs/clean', async (req, res) => {
         const { queue, status, grace = 3600000 } = req.body; // Default 1 hour
         let cleaned = 0;
         if (queue === 'email' || !queue) {
-            const result = await emailQueue.clean(grace, 1000, status);
+            const result = await email_queue_1.emailQueue.clean(grace, 1000, status);
             cleaned += result.length;
         }
         if (queue === 'notification' || !queue) {
-            const result = await notificationQueue.clean(grace, 1000, status);
+            const result = await notification_queue_1.notificationQueue.clean(grace, 1000, status);
             cleaned += result.length;
         }
         res.json({
@@ -238,16 +240,16 @@ router.get('/jobs/:jobId', async (req, res) => {
         const { queue } = req.query;
         let job;
         if (queue === 'email') {
-            job = await emailQueue.getJob(jobId);
+            job = await email_queue_1.emailQueue.getJob(jobId);
         }
         else if (queue === 'notification') {
-            job = await notificationQueue.getJob(jobId);
+            job = await notification_queue_1.notificationQueue.getJob(jobId);
         }
         if (!job) {
             return res.status(404).json({ error: 'Job not found' });
         }
         const state = await job.getState();
-        const logs = await emailQueue.getJobLogs(jobId);
+        const logs = await email_queue_1.emailQueue.getJobLogs(jobId);
         res.json({
             id: job.id,
             name: job.name,
@@ -269,5 +271,5 @@ router.get('/jobs/:jobId', async (req, res) => {
         res.status(500).json({ error: 'Failed to get job details' });
     }
 });
-export default router;
+exports.default = router;
 //# sourceMappingURL=monitoring.routes.js.map

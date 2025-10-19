@@ -8,7 +8,7 @@
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
     "target": "ES2022",
-    "module": "ESNext",
+    "module": "commonjs",
     "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
@@ -41,16 +41,16 @@
 
     // Recommended Options
     "strict": true,
-    "jsx": "react-jsx",
+    // "jsx": "react-jsx",
     // "verbatimModuleSyntax": true,
-    "isolatedModules": true,
-    "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
+    // "isolatedModules": true,
+    // "noUncheckedSideEffectImports": true,
+    // "moduleDetection": "force",
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
       "#src/*": ["./src/*"],
-      "#config/*": ["./src/config/*"],
+      // "#config/*": ["./src/config/*"],
       "#templates/*": ["./src/templates/*"],
       "#controllers/*": ["./src/controllers/*"],
       "#middlewares/*": ["./src/middlewares/*"],

@@ -1,7 +1,13 @@
-import dotenv from 'dotenv';
-import ms from 'ms';
-dotenv.config();
-export const config = {
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.config = void 0;
+const dotenv_1 = __importDefault(require("dotenv"));
+const ms_1 = __importDefault(require("ms"));
+dotenv_1.default.config();
+exports.config = {
     port: process.env.PORT || 3001,
     nodeEnv: process.env.NODE_ENV || 'development',
     redis: {
@@ -22,15 +28,15 @@ export const config = {
     },
     mainAppUrl: process.env.MAIN_APP_URL || 'http://localhost:3000',
     rateLimit: {
-        verificationResend: ms((process.env.RATE_LIMIT_VERIFICATION_RESEND || '5m')),
-        passwordResetResend: ms((process.env.RATE_LIMIT_PASSWORD_RESET_RESEND || '5m')),
+        verificationResend: (0, ms_1.default)((process.env.RATE_LIMIT_VERIFICATION_RESEND || '5m')),
+        passwordResetResend: (0, ms_1.default)((process.env.RATE_LIMIT_PASSWORD_RESET_RESEND || '5m')),
         maxVerificationPerHour: parseInt(process.env.RATE_LIMIT_MAX_VERIFICATION_PER_HOUR || '3'),
         maxPasswordResetPerHour: parseInt(process.env.RATE_LIMIT_MAX_PASSWORD_RESET_PER_HOUR || '3'),
         maxEmailsPerUserPerMinute: parseInt(process.env.RATE_LIMIT_MAX_EMAILS_PER_USER_PER_MINUTE || '10'),
     },
     tokenExpiry: {
-        verification: ms((process.env.VERIFICATION_TOKEN_EXPIRY || '24h')),
-        passwordReset: ms((process.env.PASSWORD_RESET_TOKEN_EXPIRY || '1h')),
+        verification: (0, ms_1.default)((process.env.VERIFICATION_TOKEN_EXPIRY || '24h')),
+        passwordReset: (0, ms_1.default)((process.env.PASSWORD_RESET_TOKEN_EXPIRY || '1h')),
     },
     socket: {
         cors: {

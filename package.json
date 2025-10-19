@@ -1,5 +1,4 @@
 {
-  "type": "module",
   "name": "anblog-nt-service",
   "version": "1.0.0",
   "description": "This service 2 is for AnBlog project",
@@ -64,5 +63,40 @@
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.30.1"
+  },
+  "imports": {
+    "#config": "./dist/config/index.js",
+    "#templates/*": "./dist/templates/*.js",
+    "#controllers/*": "./dist/controllers/*.js",
+    "#middlewares/*": "./dist/middlewares/*.js",
+    "#schemas/*": "./dist/schemas/*.js",
+    "#jobs/*": "./dist/jobs/*.js",
+    "#workers/*": "./dist/workers/*.js",
+    "#queues/*": "./dist/queues/*.js",
+    "#routes/*": "./dist/routes/*.js",
+    "#services/*": "./dist/services/*.js",
+    "#lib/*": "./dist/lib/*.js",
+    "#cron/*": "./dist/cron/*.js",
+    "#monitoring/*": "./dist/monitoring/*.js",
+    "#docs/*": "./dist/docs/*.js",
+    "#sockets/*": "./dist/sockets/*.js"
+  },
+  "_moduleAliases": {
+    "#src": "dist",
+    "#templates": "dist/templates",
+    "#config": "dist/config",
+    "#controllers": "dist/controllers",
+    "#schemas": "dist/schemas",
+    "#jobs": "dist/jobs",
+    "#workers": "dist/workers",
+    "#queues": "dist/queues",
+    "#middleware": "dist/middleware",
+    "#services": "dist/services",
+    "#routes": "dist/routes",
+    "#lib": "dist/lib",
+    "#cron": "dist/cron",
+    "#monitoring": "dist/monitoring",
+    "#docs": "dist/docs",
+    "#sockets": "dist/sockets"
   }
 }

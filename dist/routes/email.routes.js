@@ -1,42 +1,44 @@
-import { Router } from 'express';
-import { z } from 'zod';
-import { addEmailJob, EmailPriority } from '#queues/email.queue';
-import { canResendVerificationEmail, canResendPasswordReset, checkEmailRateLimit, formatRetryAfter, } from '#lib/rate-limiter';
-const router = Router();
-const sendEmailSchema = z.object({
-    to: z.union([z.string().email(), z.array(z.string().email())]),
-    subject: z.string().min(1).optional(), // Optional if using template
-    html: z.string().optional(),
-    text: z.string().optional(),
-    template: z.string().optional(),
-    data: z.any().optional(), // Changed from z.record(z.any())
-    priority: z.number().int().min(1).max(15).optional(),
-    userId: z.string().optional(),
-    emailType: z.enum(['verification', 'password_reset', 'normal']).optional(),
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const zod_1 = require("zod");
+const email_queue_1 = require("../queues/email.queue");
+const rate_limiter_1 = require("../lib/rate-limiter");
+const router = (0, express_1.Router)();
+const sendEmailSchema = zod_1.z.object({
+    to: zod_1.z.union([zod_1.z.string().email(), zod_1.z.array(zod_1.z.string().email())]),
+    subject: zod_1.z.string().min(1).optional(), // Optional if using template
+    html: zod_1.z.string().optional(),
+    text: zod_1.z.string().optional(),
+    template: zod_1.z.string().optional(),
+    data: zod_1.z.any().optional(), // Changed from z.record(z.any())
+    priority: zod_1.z.number().int().min(1).max(15).optional(),
+    userId: zod_1.z.string().optional(),
+    emailType: zod_1.z.enum(['verification', 'password_reset', 'normal']).optional(),
 });
 router.post('/send', async (req, res) => {
     try {
         const body = sendEmailSchema.parse(req.body);
-        const priority = body.priority || EmailPriority.NORMAL;
+        const priority = body.priority || email_queue_1.EmailPriority.NORMAL;
         const emailAddress = Array.isArray(body.to) ? body.to[0] : body.to;
         if (emailAddress) {
             if (body.emailType === 'verification') {
-                const rateLimit = await canResendVerificationEmail(emailAddress);
+                const rateLimit = await (0, rate_limiter_1.canResendVerificationEmail)(emailAddress);
                 if (!rateLimit.allowed) {
                     return res.status(429).json({
                         error: 'Rate limit exceeded',
-                        message: `Vui lòng đợi ${formatRetryAfter(rateLimit.retryAfter)} trước khi gửi lại email xác thực`,
+                        message: `Vui lòng đợi ${(0, rate_limiter_1.formatRetryAfter)(rateLimit.retryAfter)} trước khi gửi lại email xác thực`,
                         retryAfter: rateLimit.retryAfter,
                         resetAt: rateLimit.resetAt,
                     });
                 }
             }
             else if (body.emailType === 'password_reset') {
-                const rateLimit = await canResendPasswordReset(emailAddress);
+                const rateLimit = await (0, rate_limiter_1.canResendPasswordReset)(emailAddress);
                 if (!rateLimit.allowed) {
                     return res.status(429).json({
                         error: 'Rate limit exceeded',
-                        message: `Vui lòng đợi ${formatRetryAfter(rateLimit.retryAfter)} trước khi yêu cầu đặt lại mật khẩu`,
+                        message: `Vui lòng đợi ${(0, rate_limiter_1.formatRetryAfter)(rateLimit.retryAfter)} trước khi yêu cầu đặt lại mật khẩu`,
                         retryAfter: rateLimit.retryAfter,
                         resetAt: rateLimit.resetAt,
                     });
@@ -45,11 +47,11 @@ router.post('/send', async (req, res) => {
         }
         // Check general user rate limit
         if (body.userId) {
-            const userRateLimit = await checkEmailRateLimit(body.userId);
+            const userRateLimit = await (0, rate_limiter_1.checkEmailRateLimit)(body.userId);
             if (!userRateLimit.allowed) {
                 return res.status(429).json({
                     error: 'Rate limit exceeded',
-                    message: `Bạn đã gửi quá nhiều email. Vui lòng đợi ${formatRetryAfter(userRateLimit.retryAfter)}`,
+                    message: `Bạn đã gửi quá nhiều email. Vui lòng đợi ${(0, rate_limiter_1.formatRetryAfter)(userRateLimit.retryAfter)}`,
                     retryAfter: userRateLimit.retryAfter,
                     resetAt: userRateLimit.resetAt,
                 });
@@ -68,7 +70,7 @@ router.post('/send', async (req, res) => {
                 message: 'Template requires data object',
             });
         }
-        const job = await addEmailJob({
+        const job = await (0, email_queue_1.addEmailJob)({
             to: body.to,
             subject: body.subject || 'No Subject',
             ...(body.html && { html: body.html }),
@@ -85,7 +87,7 @@ router.post('/send', async (req, res) => {
         });
     }
     catch (error) {
-        if (error instanceof z.ZodError) {
+        if (error instanceof zod_1.z.ZodError) {
             return res.status(400).json({
                 error: 'Invalid request',
                 details: error.issues,
@@ -109,7 +111,7 @@ router.post('/send-bulk', async (req, res) => {
         }
         const jobs = await Promise.all(emails.map((email) => {
             const parsed = sendEmailSchema.parse(email);
-            return addEmailJob({
+            return (0, email_queue_1.addEmailJob)({
                 to: parsed.to,
                 subject: parsed.subject || 'No Subject',
                 ...(parsed.html && { html: parsed.html }),
@@ -117,7 +119,7 @@ router.post('/send-bulk', async (req, res) => {
                 ...(parsed.template && { template: parsed.template }),
                 ...(parsed.data && { data: parsed.data }),
                 ...(parsed.userId && { userId: parsed.userId }),
-            }, (parsed.priority || EmailPriority.NORMAL));
+            }, (parsed.priority || email_queue_1.EmailPriority.NORMAL));
         }));
         res.json({
             success: true,
@@ -126,7 +128,7 @@ router.post('/send-bulk', async (req, res) => {
         });
     }
     catch (error) {
-        if (error instanceof z.ZodError) {
+        if (error instanceof zod_1.z.ZodError) {
             return res.status(400).json({
                 error: 'Invalid request',
                 details: error.issues,
@@ -136,5 +138,5 @@ router.post('/send-bulk', async (req, res) => {
         res.status(500).json({ error: 'Failed to queue emails' });
     }
 });
-export default router;
+exports.default = router;
 //# sourceMappingURL=email.routes.js.map
