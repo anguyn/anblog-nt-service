@@ -5,7 +5,7 @@ services:
     env: node
     region: singapore
     plan: starter
-    buildCommand: yarn install && yarn build
+    buildCommand: yarn install
     startCommand: yarn start
     healthCheckPath: /health
     envVars:
@@ -62,7 +62,7 @@ services:
     env: node
     region: singapore
     plan: starter
-    buildCommand: yarn install && yarn build
+    buildCommand: yarn install
     startCommand: yarn worker
     envVars:
       - key: NODE_ENV
