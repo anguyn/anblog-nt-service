@@ -5,8 +5,9 @@ services:
     env: node
     region: singapore
     plan: starter
+    rootDir: ./
     buildCommand: yarn install && yarn build
-    startCommand: yarn start
+    startCommand: ls -la && ls -la dist && yarn start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -62,6 +63,7 @@ services:
     env: node
     region: singapore
     plan: starter
+    rootDir: ./
     buildCommand: yarn install && yarn build
     startCommand: yarn worker
     envVars:
