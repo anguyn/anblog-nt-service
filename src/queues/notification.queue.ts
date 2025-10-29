@@ -1,5 +1,5 @@
 import { Queue } from 'bullmq';
-import { redis } from '#lib/redis';
+import { redis } from '#libs/redis';
 
 export interface NotificationJobData {
   userId: string;

@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { SocketService } from '#services/socket.service';
 import { SOCKET_EVENTS } from '#sockets/events';
+import { t } from '#libs/i18n';
+import { getLocaleFromRequest } from '#libs/i18n/middleware';
 
 const router = Router();
 
@@ -10,10 +12,13 @@ const router = Router();
  */
 router.post('/test', async (req, res) => {
   try {
+    const locale = getLocaleFromRequest(req);
     const { userId, message } = req.body;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json({
+        error: t('validation.userIdRequired', locale),
+      });
     }
 
     // Send test notification
@@ -28,11 +33,14 @@ router.post('/test', async (req, res) => {
 
     res.json({
       success: true,
-      message: `Notification sent to user ${userId}`,
+      message: t('api.notification.sent', locale, { userId }),
     });
   } catch (error) {
+    const locale = getLocaleFromRequest(req);
     console.error('Socket test error:', error);
-    res.status(500).json({ error: 'Failed to send test notification' });
+    res.status(500).json({
+      error: t('api.notification.failed', locale),
+    });
   }
 });
 
@@ -42,6 +50,7 @@ router.post('/test', async (req, res) => {
  */
 router.post('/broadcast', async (req, res) => {
   try {
+    const locale = getLocaleFromRequest(req);
     const { message } = req.body;
 
     SocketService.broadcast(SOCKET_EVENTS.SYSTEM_MESSAGE, {
@@ -49,9 +58,15 @@ router.post('/broadcast', async (req, res) => {
       timestamp: new Date().toISOString(),
     });
 
-    res.json({ success: true, message: 'Broadcast sent' });
+    res.json({
+      success: true,
+      message: t('api.broadcast.sent', locale),
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to broadcast' });
+    const locale = getLocaleFromRequest(req);
+    res.status(500).json({
+      error: t('api.broadcast.failed', locale),
+    });
   }
 });
 

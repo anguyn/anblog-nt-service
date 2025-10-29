@@ -1,22 +1,34 @@
 import { Queue } from 'bullmq';
-import { redis } from '#lib/redis';
+import { redis } from '#libs/redis';
+import { Locale } from '#libs/i18n';
+import { EmailTemplate } from '#templates/index';
+import { EmailAttachment } from '#libs/email-providers';
 
 export interface EmailJobData {
   to: string | string[];
-  subject: string;
-  html?: string; // Optional now
+  subject?: string;
+  html?: string;
   text?: string;
-  template?: string;
-  data?: Record<string, any>;
+
+  template?: EmailTemplate;
+  templateData?: Record<string, any>;
+
+  locale?: Locale;
+
+  attachments?: EmailAttachment[];
+  replyTo?: string;
+  cc?: string[];
+  bcc?: string[];
+
   userId?: string;
+  emailType?: 'verification' | 'password_reset' | 'newsletter' | 'notification' | 'custom';
 }
 
-// Priority levels
 export enum EmailPriority {
-  CRITICAL = 1, // Verification, Password Reset
-  HIGH = 5, // Welcome emails
-  NORMAL = 10, // Regular notifications
-  LOW = 15, // Digest, Marketing
+  CRITICAL = 1,
+  HIGH = 5,
+  NORMAL = 10,
+  LOW = 15,
 }
 
 export const emailQueue = new Queue<EmailJobData>('email', {

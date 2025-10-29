@@ -1,4 +1,4 @@
-import { io } from '#lib/socket';
+import { io } from '#libs/socket';
 import { SOCKET_EVENTS } from '#sockets/events';
 
 export class SocketService {

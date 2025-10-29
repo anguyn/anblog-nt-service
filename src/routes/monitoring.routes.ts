@@ -2,13 +2,11 @@ import { Router } from 'express';
 import { emailQueue } from '#queues/email.queue';
 import { notificationQueue } from '#queues/notification.queue';
 import { Job } from 'bullmq';
+import { t } from '#libs/i18n';
+import { getLocaleFromRequest } from '#libs/i18n/middleware';
 
 const router = Router();
 
-/**
- * GET /api/monitoring/stats
- * Tổng quan về queues
- */
 router.get('/stats', async (req, res) => {
   try {
     const [emailCounts, notificationCounts] = await Promise.all([
@@ -16,7 +14,6 @@ router.get('/stats', async (req, res) => {
       notificationQueue.getJobCounts(),
     ]);
 
-    // Get workers status
     const [emailWorkers, notificationWorkers] = await Promise.all([
       emailQueue.getWorkers(),
       notificationQueue.getWorkers(),
@@ -42,14 +39,13 @@ router.get('/stats', async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get stats' });
+    const locale = getLocaleFromRequest(req);
+    res.status(500).json({
+      error: t('monitoring.stats.failed', locale),
+    });
   }
 });
 
-/**
- * GET /api/monitoring/jobs/failed
- * Lấy danh sách failed jobs
- */
 router.get('/jobs/failed', async (req, res) => {
   try {
     const queue = req.query.queue as string;
@@ -85,14 +81,13 @@ router.get('/jobs/failed', async (req, res) => {
       jobs: jobsData,
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get failed jobs' });
+    const locale = getLocaleFromRequest(req);
+    res.status(500).json({
+      error: t('monitoring.jobs.failed', locale),
+    });
   }
 });
 
-/**
- * GET /api/monitoring/jobs/waiting
- * Lấy danh sách waiting jobs
- */
 router.get('/jobs/waiting', async (req, res) => {
   try {
     const queue = req.query.queue as string;
@@ -124,16 +119,16 @@ router.get('/jobs/waiting', async (req, res) => {
       jobs: jobsData,
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get waiting jobs' });
+    const locale = getLocaleFromRequest(req);
+    res.status(500).json({
+      error: t('monitoring.jobs.waiting', locale),
+    });
   }
 });
 
-/**
- * POST /api/monitoring/jobs/:jobId/retry
- * Retry một failed job
- */
 router.post('/jobs/:jobId/retry', async (req, res) => {
   try {
+    const locale = getLocaleFromRequest(req);
     const { jobId } = req.params;
     const { queue } = req.body;
 
@@ -146,27 +141,29 @@ router.post('/jobs/:jobId/retry', async (req, res) => {
     }
 
     if (!job) {
-      return res.status(404).json({ error: 'Job not found' });
+      return res.status(404).json({
+        error: t('monitoring.job.notFound', locale),
+      });
     }
 
     await job.retry();
 
     res.json({
       success: true,
-      message: 'Job queued for retry',
+      message: t('monitoring.job.retryQueued', locale),
       jobId: job.id,
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to retry job' });
+    const locale = getLocaleFromRequest(req);
+    res.status(500).json({
+      error: t('monitoring.job.retryFailed', locale),
+    });
   }
 });
 
-/**
- * POST /api/monitoring/jobs/retry-failed
- * Retry tất cả failed jobs
- */
 router.post('/jobs/retry-failed', async (req, res) => {
   try {
+    const locale = getLocaleFromRequest(req);
     const { queue, limit = 100 } = req.body;
 
     let retriedCount = 0;
@@ -189,20 +186,20 @@ router.post('/jobs/retry-failed', async (req, res) => {
 
     res.json({
       success: true,
-      message: `Retried ${retriedCount} failed jobs`,
+      message: t('monitoring.jobs.retriedCount', locale, { count: retriedCount }),
       count: retriedCount,
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to retry jobs' });
+    const locale = getLocaleFromRequest(req);
+    res.status(500).json({
+      error: t('monitoring.jobs.retryAllFailed', locale),
+    });
   }
 });
 
-/**
- * DELETE /api/monitoring/jobs/:jobId
- * Xóa một job
- */
 router.delete('/jobs/:jobId', async (req, res) => {
   try {
+    const locale = getLocaleFromRequest(req);
     const { jobId } = req.params;
     const { queue } = req.query;
 
@@ -215,27 +212,29 @@ router.delete('/jobs/:jobId', async (req, res) => {
     }
 
     if (!job) {
-      return res.status(404).json({ error: 'Job not found' });
+      return res.status(404).json({
+        error: t('monitoring.job.notFound', locale),
+      });
     }
 
     await job.remove();
 
     res.json({
       success: true,
-      message: 'Job removed',
+      message: t('monitoring.job.removed', locale),
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to remove job' });
+    const locale = getLocaleFromRequest(req);
+    res.status(500).json({
+      error: t('monitoring.job.removeFailed', locale),
+    });
   }
 });
 
-/**
- * POST /api/monitoring/jobs/clean
- * Clean old jobs
- */
 router.post('/jobs/clean', async (req, res) => {
   try {
-    const { queue, status, grace = 3600000 } = req.body; // Default 1 hour
+    const locale = getLocaleFromRequest(req);
+    const { queue, status, grace = 3600000 } = req.body;
 
     let cleaned = 0;
 
@@ -251,20 +250,20 @@ router.post('/jobs/clean', async (req, res) => {
 
     res.json({
       success: true,
-      message: `Cleaned ${cleaned} ${status} jobs`,
+      message: t('monitoring.jobs.cleaned', locale, { count: cleaned, status }),
       count: cleaned,
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to clean jobs' });
+    const locale = getLocaleFromRequest(req);
+    res.status(500).json({
+      error: t('monitoring.jobs.cleanFailed', locale),
+    });
   }
 });
 
-/**
- * GET /api/monitoring/jobs/:jobId
- * Lấy chi tiết một job
- */
 router.get('/jobs/:jobId', async (req, res) => {
   try {
+    const locale = getLocaleFromRequest(req);
     const { jobId } = req.params;
     const { queue } = req.query;
 
@@ -277,7 +276,9 @@ router.get('/jobs/:jobId', async (req, res) => {
     }
 
     if (!job) {
-      return res.status(404).json({ error: 'Job not found' });
+      return res.status(404).json({
+        error: t('monitoring.job.notFound', locale),
+      });
     }
 
     const state = await job.getState();
@@ -300,7 +301,10 @@ router.get('/jobs/:jobId', async (req, res) => {
       logs,
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get job details' });
+    const locale = getLocaleFromRequest(req);
+    res.status(500).json({
+      error: t('monitoring.job.detailsFailed', locale),
+    });
   }
 });
 

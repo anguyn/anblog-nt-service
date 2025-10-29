@@ -1,5 +1,5 @@
 import { Worker, Job } from 'bullmq';
-import { redis } from '#lib/redis';
+import { redis } from '#libs/redis';
 import { NotificationJobData } from '#queues/notification.queue';
 
 export const notificationWorker = new Worker<NotificationJobData>(

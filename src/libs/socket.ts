@@ -1,4 +1,4 @@
-// src/lib/socket.ts
+// src/libs/socket.ts
 import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { redis } from './redis';

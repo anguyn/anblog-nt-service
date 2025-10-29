@@ -15,7 +15,15 @@ export const config = {
   },
 
   email: {
+    provider: (process.env.EMAIL_PROVIDER || 'resend') as 'resend' | 'sendpulse',
+
     resendApiKey: process.env.RESEND_API_KEY!,
+
+    sendpulse: {
+      apiUserId: process.env.SENDPULSE_API_USER_ID || '',
+      apiSecret: process.env.SENDPULSE_API_SECRET || '',
+    },
+
     from: {
       email: process.env.FROM_EMAIL || 'noreply@example.com',
       name: process.env.FROM_NAME || 'App',
@@ -53,5 +61,17 @@ export const config = {
 
   jwtSecret: {
     jwtSecretKey: process.env.JWT_SECRET_KEY!,
+  },
+
+  cleanup: {
+    // Thời gian tồn tại tối đa của user chưa verify email
+    unverifiedUserRetention: ms((process.env.UNVERIFIED_USER_RETENTION || '7d') as ms.StringValue),
+
+    // Enable/disable cleanup jobs
+    cleanupUnverifiedUsers: process.env.CLEANUP_UNVERIFIED_USERS_ENABLED === 'true',
+    cleanupExpiredTokens: process.env.CLEANUP_EXPIRED_TOKENS_ENABLED === 'true',
+
+    // Log deleted users (for audit)
+    logDeletedUsers: process.env.LOG_DELETED_USERS === 'true',
   },
 };

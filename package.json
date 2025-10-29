@@ -22,7 +22,11 @@
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
-    "worker": "node dist/workers/index.js"
+    "worker": "node dist/workers/index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:studio": "prisma studio",
+    "db:pull": "prisma db pull",
+    "postinstall": "prisma generate"
   },
   "lint-staged": {
     "src/**/*.{js,ts}": [
@@ -34,7 +38,9 @@
     "@bull-board/api": "^6.13.1",
     "@bull-board/express": "^6.13.1",
     "@bull-board/ui": "^6.13.1",
+    "@prisma/client": "^6.17.1",
     "@socket.io/redis-adapter": "^8.3.0",
+    "@vitalets/google-translate-api": "^9.2.1",
     "bullmq": "^5.61.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
@@ -66,6 +72,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.4",
     "prettier": "^3.5.3",
+    "prisma": "^6.17.1",
     "ts-node": "^10.9.2",
     "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^4.2.0",
@@ -84,8 +91,8 @@
     "#queues/*": "./dist/queues/*.js",
     "#routes/*": "./dist/routes/*.js",
     "#services/*": "./dist/services/*.js",
-    "#lib/*": "./dist/lib/*.js",
-    "#cron/*": "./dist/cron/*.js",
+    "#libs/*": "./dist/libs/*.js",
+    "#types/*": "./dist/types/*.js",
     "#monitoring/*": "./dist/monitoring/*.js",
     "#docs/*": "./dist/docs/*.js",
     "#sockets/*": "./dist/sockets/*.js"
@@ -102,8 +109,8 @@
     "#middleware": "dist/middleware",
     "#services": "dist/services",
     "#routes": "dist/routes",
-    "#lib": "dist/lib",
-    "#cron": "dist/cron",
+    "#libs": "dist/libs",
+    "#types": "dist/types",
     "#monitoring": "dist/monitoring",
     "#docs": "dist/docs",
     "#sockets": "dist/sockets"

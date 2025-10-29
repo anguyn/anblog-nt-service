@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { redis } from '#lib/redis';
+import { redis } from '#libs/redis';
 import { emailQueue } from '#queues/email.queue';
 import { notificationQueue } from '#queues/notification.queue';
 

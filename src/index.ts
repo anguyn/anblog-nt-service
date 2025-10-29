@@ -5,6 +5,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config';
+import { startCronJobs } from '#jobs/index';
 
 // Import routes
 import emailRoutes from '#routes/email.routes';
@@ -105,6 +106,9 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     ...(isDevelopment && { stack: err.stack }),
   });
 });
+
+// Start cron jobs
+startCronJobs();
 
 // Start server
 const PORT = process.env.PORT || 10000;

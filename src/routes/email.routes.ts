@@ -6,17 +6,19 @@ import {
   canResendPasswordReset,
   checkEmailRateLimit,
   formatRetryAfter,
-} from '#lib/rate-limiter';
+} from '#libs/rate-limiter';
+import { t } from '#libs/i18n';
+import { getLocaleFromRequest } from '#libs/i18n/middleware';
 
 const router = Router();
 
 const sendEmailSchema = z.object({
   to: z.union([z.string().email(), z.array(z.string().email())]),
-  subject: z.string().min(1).optional(), // Optional if using template
+  subject: z.string().min(1).optional(),
   html: z.string().optional(),
   text: z.string().optional(),
   template: z.string().optional(),
-  data: z.any().optional(), // Changed from z.record(z.any())
+  data: z.any().optional(),
   priority: z.number().int().min(1).max(15).optional(),
   userId: z.string().optional(),
   emailType: z.enum(['verification', 'password_reset', 'normal']).optional(),
@@ -24,17 +26,21 @@ const sendEmailSchema = z.object({
 
 router.post('/send', async (req, res) => {
   try {
+    const locale = getLocaleFromRequest(req);
     const body = sendEmailSchema.parse(req.body);
     const priority = body.priority || EmailPriority.NORMAL;
     const emailAddress = Array.isArray(body.to) ? body.to[0] : body.to;
 
+    // Rate limit checks
     if (emailAddress) {
       if (body.emailType === 'verification') {
         const rateLimit = await canResendVerificationEmail(emailAddress);
         if (!rateLimit.allowed) {
           return res.status(429).json({
-            error: 'Rate limit exceeded',
-            message: `Vui lòng đợi ${formatRetryAfter(rateLimit.retryAfter!)} trước khi gửi lại email xác thực`,
+            error: t('rateLimit.exceeded', locale),
+            message: t('rateLimit.verification', locale, {
+              time: formatRetryAfter(rateLimit.retryAfter!),
+            }),
             retryAfter: rateLimit.retryAfter,
             resetAt: rateLimit.resetAt,
           });
@@ -43,8 +49,10 @@ router.post('/send', async (req, res) => {
         const rateLimit = await canResendPasswordReset(emailAddress);
         if (!rateLimit.allowed) {
           return res.status(429).json({
-            error: 'Rate limit exceeded',
-            message: `Vui lòng đợi ${formatRetryAfter(rateLimit.retryAfter!)} trước khi yêu cầu đặt lại mật khẩu`,
+            error: t('rateLimit.exceeded', locale),
+            message: t('rateLimit.passwordReset', locale, {
+              time: formatRetryAfter(rateLimit.retryAfter!),
+            }),
             retryAfter: rateLimit.retryAfter,
             resetAt: rateLimit.resetAt,
           });
@@ -52,31 +60,33 @@ router.post('/send', async (req, res) => {
       }
     }
 
-    // Check general user rate limit
+    // User rate limit
     if (body.userId) {
       const userRateLimit = await checkEmailRateLimit(body.userId);
       if (!userRateLimit.allowed) {
         return res.status(429).json({
-          error: 'Rate limit exceeded',
-          message: `Bạn đã gửi quá nhiều email. Vui lòng đợi ${formatRetryAfter(userRateLimit.retryAfter!)}`,
+          error: t('rateLimit.exceeded', locale),
+          message: t('rateLimit.tooManyEmails', locale, {
+            time: formatRetryAfter(userRateLimit.retryAfter!),
+          }),
           retryAfter: userRateLimit.retryAfter,
           resetAt: userRateLimit.resetAt,
         });
       }
     }
 
-    // Validate: must have either (html/text) or (template + data)
+    // Validation
     if (!body.html && !body.text && !body.template) {
       return res.status(400).json({
-        error: 'Invalid request',
-        message: 'Must provide either html/text or template',
+        error: t('validation.invalidRequest', locale),
+        message: t('validation.mustProvideHtmlOrTemplate', locale),
       });
     }
 
     if (body.template && !body.data) {
       return res.status(400).json({
-        error: 'Invalid request',
-        message: 'Template requires data object',
+        error: t('validation.invalidRequest', locale),
+        message: t('validation.templateRequiresData', locale),
       });
     }
 
@@ -97,35 +107,46 @@ router.post('/send', async (req, res) => {
       success: true,
       jobId: job.id,
       priority,
-      message: 'Email queued successfully',
+      message: t('api.email.queued', locale),
     });
   } catch (error) {
+    const locale = getLocaleFromRequest(req);
+
     if (error instanceof z.ZodError) {
       return res.status(400).json({
-        error: 'Invalid request',
+        error: t('validation.invalidRequest', locale),
         details: error.issues,
       });
     }
 
     console.error('Send email error:', error);
-    res.status(500).json({ error: 'Failed to queue email' });
+    res.status(500).json({
+      error: t('api.email.failed', locale),
+    });
   }
 });
 
 router.post('/send-bulk', async (req, res) => {
   try {
+    const locale = getLocaleFromRequest(req);
     const { emails } = req.body;
 
     if (!Array.isArray(emails)) {
-      return res.status(400).json({ error: 'emails must be an array' });
+      return res.status(400).json({
+        error: t('validation.emailsArray', locale),
+      });
     }
 
     if (emails.length === 0) {
-      return res.status(400).json({ error: 'emails array cannot be empty' });
+      return res.status(400).json({
+        error: t('validation.emailsNotEmpty', locale),
+      });
     }
 
     if (emails.length > 1000) {
-      return res.status(400).json({ error: 'Maximum 1000 emails per batch' });
+      return res.status(400).json({
+        error: t('validation.maxBulkEmails', locale),
+      });
     }
 
     const jobs = await Promise.all(
@@ -149,18 +170,22 @@ router.post('/send-bulk', async (req, res) => {
     res.json({
       success: true,
       count: jobs.length,
-      message: `${jobs.length} emails queued successfully`,
+      message: t('api.email.bulkQueued', locale, { count: jobs.length }),
     });
   } catch (error) {
+    const locale = getLocaleFromRequest(req);
+
     if (error instanceof z.ZodError) {
       return res.status(400).json({
-        error: 'Invalid request',
+        error: t('validation.invalidRequest', locale),
         details: error.issues,
       });
     }
 
     console.error('Send bulk emails error:', error);
-    res.status(500).json({ error: 'Failed to queue emails' });
+    res.status(500).json({
+      error: t('api.email.failed', locale),
+    });
   }
 });
 

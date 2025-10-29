@@ -60,8 +60,8 @@
       "#queues/*": ["./src/queues/*"],
       "#routes/*": ["./src/routes/*"],
       "#services/*": ["./src/services/*"],
-      "#lib/*": ["./src/lib/*"],
-      "#cron/*": ["./src/cron/*"],
+      "#libs/*": ["./src/libs/*"],
+      "#types/*": ["./src/types/*"],
       "#monitoring/*": ["./src/monitoring/*"],
       "#docs/*": ["./src/docs/*"],
       "#sockets/*": ["./src/sockets/*"]
