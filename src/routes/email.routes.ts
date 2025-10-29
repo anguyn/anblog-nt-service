@@ -21,7 +21,7 @@ const sendEmailSchema = z.object({
   data: z.any().optional(),
   priority: z.number().int().min(1).max(15).optional(),
   userId: z.string().optional(),
-  emailType: z.enum(['verification', 'password_reset', 'normal']).optional(),
+  emailType: z.enum(['verification', 'password_reset', 'normal', 'notification', 'newsletter']).optional(),
 });
 
 router.post('/send', async (req, res) => {
@@ -97,8 +97,10 @@ router.post('/send', async (req, res) => {
         ...(body.html && { html: body.html }),
         ...(body.text && { text: body.text }),
         ...(body.template && { template: body.template }),
+        ...(body.data && { templateData: body.data }),
         ...(body.data && { data: body.data }),
         ...(body.userId && { userId: body.userId }),
+        ...(body.emailType && { emailType: body.emailType }),
       },
       priority as EmailPriority
     );

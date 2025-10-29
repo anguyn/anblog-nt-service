@@ -59,6 +59,7 @@ let emailService: EmailService;
 
 export function getEmailProvider(): EmailService {
   if (!emailService) {
+    console.log('Dô hong?');
     emailService = new EmailService();
   }
   return emailService;
