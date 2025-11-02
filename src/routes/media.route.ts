@@ -41,6 +41,8 @@ router.post('/translate/post', async (req, res) => {
       targetLanguage: targetLanguage as 'en' | 'vi',
     });
 
+    console.log('Ủa');
+
     res.json({
       success: true,
       jobId: job.id,

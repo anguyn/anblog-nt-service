@@ -1,7 +1,7 @@
-// src/workers/index.ts
 import './email.worker';
 import './notification.worker';
 import { emailWorker } from './email.worker';
+import { translationWorker } from '#src/queues/media.queue';
 import { notificationWorker } from './notification.worker';
 
 console.log('🔧 Workers initialized');
@@ -16,6 +16,9 @@ const gracefulShutdown = async (signal: string) => {
 
     await notificationWorker.close();
     console.log('✅ Notification worker closed');
+
+    await translationWorker.close();
+    console.log('✅ Translation worker closed');
 
     console.log('👋 All workers closed successfully');
     process.exit(0);

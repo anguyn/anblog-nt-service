@@ -104,6 +104,7 @@ model User {
   securityStamp     String    @default(cuid()) // Thay đổi khi cần invalidate sessions
   twoFactorEnabled  Boolean   @default(false)
   twoFactorSecret   String? // Encrypted TOTP secret
+  pending2FASecret  String?  // Temporary secret during setup (plain text)
 
   // Backup codes cho 2FA
   backupCodes BackupCode[]

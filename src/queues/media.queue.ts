@@ -43,13 +43,30 @@ export const translationWorker = new Worker<TranslationJobData>(
     try {
       switch (type) {
         case 'post': {
+          await prisma.translationQueue.update({
+            where: {
+              postId_language: { postId: id, language: targetLanguage },
+            },
+            data: {
+              status: 'PROCESSING',
+              attempts: { increment: 1 },
+            },
+          });
+
           const content = await TranslationService.translatePost(id, targetLanguage);
           const translation = await TranslationService.saveTranslation(id, targetLanguage, content);
 
-          console.log(`✅ Translation completed: post ${id} (${translation.id})`);
+          await prisma.translationQueue.update({
+            where: {
+              postId_language: { postId: id, language: targetLanguage },
+            },
+            data: {
+              status: 'COMPLETED',
+              processedAt: new Date(),
+            },
+          });
 
-          // After translation completes, queue TTS generation for translated content
-          console.log(`[Translation Worker] Checking for pending TTS jobs for post ${id}...`);
+          console.log(`✅ Translation completed: post ${id} (${translation.id})`);
 
           // Retry any failed TTS jobs for this translation
           //   const ttsPendingJobs = await ttsQueue.getJobs(['waiting', 'delayed', 'failed']);
@@ -217,9 +234,34 @@ export const translationWorker = new Worker<TranslationJobData>(
 // ==========================================
 
 export async function addTranslationJob(data: TranslationJobData) {
-  return await translationQueue.add('translate', data, {
+  // Tạo/update TranslationQueue record
+  if (data.type === 'post') {
+    console.log('Ủa có vào không chèn: ', data);
+    const res = await prisma.translationQueue.upsert({
+      where: {
+        postId_language: {
+          postId: data.id,
+          language: data.targetLanguage,
+        },
+      },
+      create: {
+        postId: data.id,
+        language: data.targetLanguage,
+        status: 'PENDING',
+        priority: 5,
+      },
+      update: {
+        status: 'PENDING',
+        error: null,
+        attempts: 0,
+      },
+    });
+    console.log('Ủa có vào không chèn 1: ', res);
+  }
+
+  return await translationQueue.add('translation', data, {
     priority: data.type === 'post' ? 5 : 10,
-    jobId: `translation-${data.type}-${data.id}-${data.targetLanguage}`, // Prevent duplicates
+    jobId: `translation-${data.type}-${data.id}-${data.targetLanguage}`,
   });
 }
 
@@ -244,8 +286,27 @@ translationWorker.on('completed', (job) => {
   console.log(`✅ [Translation Queue] Job ${job.id} completed`);
 });
 
-translationWorker.on('failed', (job, error) => {
+translationWorker.on('failed', async (job, error) => {
   console.error(`❌ [Translation Queue] Job ${job?.id} failed:`, error.message);
+
+  if (job?.data) {
+    const { id, targetLanguage } = job.data;
+
+    await prisma.translationQueue
+      .update({
+        where: {
+          postId_language: { postId: id, language: targetLanguage },
+        },
+        data: {
+          status: 'FAILED',
+          error: error.message,
+          processedAt: new Date(),
+        },
+      })
+      .catch((err) => {
+        console.error('Failed to update queue status:', err);
+      });
+  }
 });
 
 // ttsWorker.on('completed', (job) => {

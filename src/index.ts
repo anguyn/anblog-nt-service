@@ -8,11 +8,12 @@ import { config } from './config';
 import { startCronJobs } from '#jobs/index';
 
 // Import routes
-import emailRoutes from '#routes/email.routes';
-import healthRoutes from '#routes/health.routes';
-import notificationRoutes from '#routes/notification.routes';
-import socketRoutes from '#routes/socket.routes';
-import monitoringRoutes from '#routes/monitoring.routes';
+import emailRoutes from '#routes/email.route';
+import mediaRoutes from '#routes/media.route';
+import healthRoutes from '#routes/health.route';
+import notificationRoutes from '#routes/notification.route';
+import socketRoutes from '#routes/socket.route';
+import monitoringRoutes from '#routes/monitoring.route';
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -62,6 +63,7 @@ if (isDevelopment) {
 
 // Routes
 app.use('/api/email', emailRoutes);
+app.use('/api/media', mediaRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/socket', socketRoutes);
 app.use('/api/monitoring', monitoringRoutes);
