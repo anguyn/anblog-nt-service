@@ -1,5 +1,6 @@
 import { translate } from '@vitalets/google-translate-api';
 import { prisma } from '#libs/prisma';
+import Groq from 'groq-sdk';
 
 export interface TranslationContent {
   title: string;
@@ -30,21 +31,329 @@ interface MyMemoryResponse {
   responseStatus: number;
 }
 
+interface GeminiResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+  error?: {
+    message: string;
+    code: number;
+  };
+}
+
+interface GroqConfig {
+  model: string;
+  requestsUsed: number;
+  lastReset: number;
+  dailyLimit: number;
+}
+
 export class TranslationService {
+  // Groq models configuration với daily limits
+  private static groqModels: GroqConfig[] = [
+    { model: 'llama-3.3-70b-versatile', requestsUsed: 0, lastReset: Date.now(), dailyLimit: 14400 },
+    { model: 'llama-3.1-70b-versatile', requestsUsed: 0, lastReset: Date.now(), dailyLimit: 14400 },
+    { model: 'mixtral-8x7b-32768', requestsUsed: 0, lastReset: Date.now(), dailyLimit: 14400 },
+  ];
+
+  private static groqClient: Groq | null = null;
+  private static geminiApiKey: string | null = null;
+
+  /**
+   * Initialize AI clients
+   */
+  private static initializeAI() {
+    if (!this.groqClient && process.env.GROQ_API_KEY) {
+      this.groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    }
+    if (!this.geminiApiKey && process.env.GOOGLE_AI_KEY) {
+      this.geminiApiKey = process.env.GOOGLE_AI_KEY;
+    }
+  }
+
+  /**
+   * Get available Groq model (rotate to avoid rate limits)
+   */
+  private static getAvailableGroqModel(): GroqConfig | null {
+    const now = Date.now();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+
+    // Reset counters if 24h passed
+    this.groqModels.forEach((config) => {
+      if (now - config.lastReset > oneDayMs) {
+        config.requestsUsed = 0;
+        config.lastReset = now;
+      }
+    });
+
+    // Find model with available quota
+    return this.groqModels.find((config) => config.requestsUsed < config.dailyLimit) || null;
+  }
+
+  /**
+   * Extract and protect code blocks, scripts, styles from HTML
+   */
+  private static extractProtectedContent(html: string): {
+    cleanHtml: string;
+    protectedBlocks: Map<string, string>;
+  } {
+    const protectedBlocks = new Map<string, string>();
+    let counter = 0;
+
+    const patterns = [
+      // Code blocks (pre, code)
+      { regex: /<pre[^>]*>[\s\S]*?<\/pre>/gi, type: 'PRE' },
+      { regex: /<code[^>]*>[\s\S]*?<\/code>/gi, type: 'CODE' },
+
+      // Scripts and styles
+      { regex: /<script\b[^>]*>[\s\S]*?<\/script>/gi, type: 'SCRIPT' },
+      { regex: /<style\b[^>]*>[\s\S]*?<\/style>/gi, type: 'STYLE' },
+
+      // Inline code
+      { regex: /<code[^>]*>[^<]+<\/code>/gi, type: 'INLINE_CODE' },
+
+      // HTML attributes (class, id, data-*, style)
+      { regex: /\s(class|id|data-[\w-]+|style|href|src)="[^"]*"/gi, type: 'ATTR' },
+      { regex: /\s(class|id|data-[\w-]+|style|href|src)='[^']*'/gi, type: 'ATTR' },
+
+      // URLs
+      { regex: /https?:\/\/[^\s<>"]+/gi, type: 'URL' },
+
+      // HTML entities
+      { regex: /&[a-zA-Z]+;|&#\d+;|&#x[0-9a-fA-F]+;/gi, type: 'ENTITY' },
+
+      // Mathematical expressions (if wrapped in specific tags)
+      { regex: /<math[^>]*>[\s\S]*?<\/math>/gi, type: 'MATH' },
+
+      // SVG content
+      { regex: /<svg[^>]*>[\s\S]*?<\/svg>/gi, type: 'SVG' },
+    ];
+
+    let cleanHtml = html;
+
+    patterns.forEach(({ regex, type }) => {
+      cleanHtml = cleanHtml.replace(regex, (match) => {
+        const placeholder = `__PROTECTED_${type}_${counter}__`;
+        protectedBlocks.set(placeholder, match);
+        counter++;
+        return placeholder;
+      });
+    });
+
+    return { cleanHtml, protectedBlocks };
+  }
+
+  /**
+   * Restore protected content
+   */
+  private static restoreProtectedContent(translatedHtml: string, protectedBlocks: Map<string, string>): string {
+    let restored = translatedHtml;
+
+    protectedBlocks.forEach((original, placeholder) => {
+      restored = restored.replace(new RegExp(placeholder, 'g'), original);
+    });
+
+    return restored;
+  }
+
+  /**
+   * Extract only translatable text from HTML (for AI translation)
+   */
+  private static extractTranslatableText(html: string): string[] {
+    // Remove protected content first
+    const { cleanHtml } = this.extractProtectedContent(html);
+
+    // Extract text from HTML tags
+    const textNodes: string[] = [];
+    const tempDiv = cleanHtml.replace(
+      /<(p|h[1-6]|li|td|th|div|span|a|strong|em|b|i)[^>]*>([^<]+)<\/\1>/gi,
+      (match, tag, text) => {
+        const cleaned = text.trim();
+        if (cleaned && cleaned.length > 0) {
+          textNodes.push(cleaned);
+        }
+        return match;
+      }
+    );
+
+    return textNodes.filter((text) => text.length > 0);
+  }
+
+  /**
+   * Translate with Groq AI (Primary method)
+   */
+  private static async translateWithGroq(text: string, targetLang: 'en' | 'vi'): Promise<string> {
+    this.initializeAI();
+
+    if (!this.groqClient) {
+      throw new Error('Groq API key not configured');
+    }
+
+    const modelConfig = this.getAvailableGroqModel();
+    if (!modelConfig) {
+      throw new Error('All Groq models reached daily limit');
+    }
+
+    const systemPrompt = `You are a professional translator specializing in blog content translation.
+
+CRITICAL RULES:
+1. Translate ONLY the text content, preserve ALL HTML tags, attributes, and structure
+2. DO NOT translate: code blocks, CSS classes, IDs, data attributes, URLs, HTML entities
+3. Maintain the same formatting, line breaks, and HTML structure
+4. Keep technical terms, brand names, and proper nouns as-is when appropriate
+5. Translate naturally to ${targetLang === 'vi' ? 'Vietnamese' : 'English'}, maintaining the original tone
+
+Return ONLY the translated HTML, no explanations.`;
+
+    try {
+      const response = await this.groqClient.chat.completions.create({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Translate this HTML to ${targetLang}:\n\n${text}` },
+        ],
+        model: modelConfig.model,
+        temperature: 0.3,
+        max_tokens: 8000,
+      });
+
+      modelConfig.requestsUsed++;
+      console.log(
+        `✅ Translated with Groq (${modelConfig.model}) - ${modelConfig.requestsUsed}/${modelConfig.dailyLimit}`
+      );
+
+      return response.choices[0]?.message?.content || text;
+    } catch (error) {
+      console.error(`Groq translation failed:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Translate with Google Gemini (Fallback AI)
+   */
+  private static async translateWithGemini(text: string, targetLang: 'en' | 'vi'): Promise<string> {
+    this.initializeAI();
+
+    if (!this.geminiApiKey) {
+      throw new Error('Google AI key not configured');
+    }
+
+    const prompt = `Translate this HTML content to ${targetLang === 'vi' ? 'Vietnamese' : 'English'}. 
+Rules: Preserve ALL HTML tags, attributes, code blocks, and structure. Translate ONLY the text content. Do NOT translate CSS classes, IDs, URLs, or code.
+
+${text}`;
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.geminiApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.3, maxOutputTokens: 8000 },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.statusText}`);
+      }
+
+      const data = (await response.json()) as GeminiResponse;
+
+      if (data.error) {
+        throw new Error(`Gemini API error: ${data.error.message}`);
+      }
+
+      const translated = data.candidates?.[0]?.content?.parts?.[0]?.text || text;
+
+      console.log('✅ Translated with Google Gemini');
+      return translated;
+    } catch (error) {
+      console.error('Gemini translation failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Translate HTML content with AI (with smart protection)
+   */
+  private static async translateHTMLWithAI(html: string, targetLang: 'en' | 'vi'): Promise<string> {
+    // Step 1: Extract and protect non-translatable content
+    const { cleanHtml, protectedBlocks } = this.extractProtectedContent(html);
+
+    // Step 2: Try AI translation
+    let translatedClean: string;
+
+    try {
+      // Primary: Groq
+      translatedClean = await this.translateWithGroq(cleanHtml, targetLang);
+    } catch (groqError) {
+      console.warn('Groq failed, trying Gemini...');
+
+      try {
+        // Fallback: Gemini
+        translatedClean = await this.translateWithGemini(cleanHtml, targetLang);
+      } catch (geminiError) {
+        console.error('All AI translation failed, falling back to manual extraction');
+        throw new Error('AI_TRANSLATION_FAILED');
+      }
+    }
+
+    // Step 3: Restore protected content
+    const finalTranslated = this.restoreProtectedContent(translatedClean, protectedBlocks);
+
+    return finalTranslated;
+  }
+
   /**
    * Translate text with fallback providers
-   * Priority: Google Translate -> LibreTranslate -> Lingva -> MyMemory
+   * Priority: AI (Groq/Gemini) -> Manual extraction + Traditional APIs
    */
   private static async translateText(
     text: string,
     targetLang: 'en' | 'vi',
-    options: { preserveFormatting?: boolean } = {}
+    options: { preserveFormatting?: boolean; isHTML?: boolean } = {}
   ): Promise<string> {
     if (!text || text.trim().length === 0) {
       return text;
     }
 
-    const chunks = this.splitTextIntoChunks(text, 4000);
+    // Strategy 1: If HTML and has AI keys, use AI translation
+    if (options.isHTML && (process.env.GROQ_API_KEY || process.env.GOOGLE_AI_KEY)) {
+      try {
+        return await this.translateHTMLWithAI(text, targetLang);
+      } catch (error) {
+        if ((error as Error).message === 'AI_TRANSLATION_FAILED') {
+          console.log('⚠️ AI failed, falling back to manual extraction + traditional APIs');
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    // Strategy 2: Manual extraction + traditional translation APIs
+    return await this.translateWithManualExtraction(text, targetLang, options);
+  }
+
+  /**
+   * Manual extraction and translation (fallback method)
+   */
+  private static async translateWithManualExtraction(
+    text: string,
+    targetLang: 'en' | 'vi',
+    options: { preserveFormatting?: boolean; isHTML?: boolean } = {}
+  ): Promise<string> {
+    // Extract and protect content
+    const { cleanHtml, protectedBlocks } = this.extractProtectedContent(text);
+
+    // Split into chunks and translate
+    const chunks = this.splitTextIntoChunks(cleanHtml, 4000);
     const translatedChunks: string[] = [];
 
     for (const chunk of chunks) {
@@ -96,14 +405,17 @@ export class TranslationService {
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
-    return translatedChunks.join('\n\n');
+    const translatedClean = translatedChunks.join('\n\n');
+
+    // Restore protected content
+    return this.restoreProtectedContent(translatedClean, protectedBlocks);
   }
 
   /**
    * LibreTranslate API
    */
   private static async translateWithLibre(text: string, targetLang: string): Promise<string> {
-    const apiUrl = process.env.LIBRETRANSLATE_URL || 'https://libretranslate.com/translate';
+    const apiUrl = 'https://libretranslate.com/translate';
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -193,22 +505,20 @@ export class TranslationService {
       throw new Error(`Post ${postId} not found`);
     }
 
-    const textContent = this.extractTextFromContent(post.content, post.contentFormat);
+    const isHTML = post.contentFormat === 'HTML';
 
     const [title, excerpt, content, metaTitle, metaDescription] = await Promise.all([
       this.translateText(post.title, targetLanguage),
       post.excerpt ? this.translateText(post.excerpt, targetLanguage) : Promise.resolve(null),
-      this.translateText(textContent, targetLanguage, { preserveFormatting: true }),
+      this.translateText(post.content, targetLanguage, { preserveFormatting: true, isHTML }),
       post.metaTitle ? this.translateText(post.metaTitle, targetLanguage) : Promise.resolve(null),
       post.metaDescription ? this.translateText(post.metaDescription, targetLanguage) : Promise.resolve(null),
     ]);
 
-    const translatedContent = this.reconstructContent(content, post.content, post.contentFormat);
-
     return {
       title,
       excerpt,
-      content: translatedContent,
+      content,
       metaTitle,
       metaDescription,
     };
@@ -288,50 +598,6 @@ export class TranslationService {
 
   //   return { name };
   // }
-
-  private static extractTextFromContent(content: string, format: string): string {
-    if (format === 'MARKDOWN') {
-      return content
-        .replace(/!\[.*?\]\(.*?\)/g, '')
-        .replace(/\[([^\]]+)\]\(.*?\)/g, '$1')
-        .replace(/^#{1,6}\s+/gm, '')
-        .replace(/\*\*([^*]+)\*\*/g, '$1')
-        .replace(/\*([^*]+)\*/g, '$1')
-        .replace(/`([^`]+)`/g, '$1');
-    } else if (format === 'HTML') {
-      return content
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-
-    return content;
-  }
-
-  private static reconstructContent(translatedText: string, originalContent: string, format: string): string {
-    if (format === 'MARKDOWN') {
-      const lines = originalContent.split('\n');
-      const translatedLines = translatedText.split('\n');
-
-      return lines
-        .map((line, i) => {
-          const translatedLine = translatedLines[i] || '';
-          const headerMatch = line.match(/^(#{1,6})\s+/);
-          if (headerMatch) {
-            return `${headerMatch[1]} ${translatedLine}`;
-          }
-          if (line.match(/^[\-\*]\s+/)) {
-            return `- ${translatedLine}`;
-          }
-          return translatedLine;
-        })
-        .join('\n');
-    }
-
-    return translatedText;
-  }
 
   private static splitTextIntoChunks(text: string, chunkSize: number): string[] {
     const chunks: string[] = [];
