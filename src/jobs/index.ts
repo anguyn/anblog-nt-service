@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { cleanupOldJobs } from './cleanup-jobs';
 import { PostService } from '#services/post.service';
 import { CleanupService } from '#services/cleanup.service';
+import { syncViewCounts } from '#sockets/handlers/post-view.handler';
 
 export function startCronJobs() {
   console.log('🚀 Starting cron jobs...');
@@ -73,6 +74,25 @@ export function startCronJobs() {
   });
 
   // ==========================================
+  // VIEW SYNC TASK
+  // ==========================================
+
+  // Sync view counts - every 15 minutes
+  cron.schedule('*/15 * * * *', async () => {
+    console.log('[CRON] Starting view count sync...');
+    try {
+      const result = await syncViewCounts();
+      if (result) {
+        console.log('[CRON] View count sync completed successfully');
+      } else {
+        console.warn('[CRON] View count sync completed with errors');
+      }
+    } catch (error) {
+      console.error('[CRON] Error syncing view counts:', error);
+    }
+  });
+
+  // ==========================================
   // CLEANUP TASKS
   // ==========================================
 
@@ -86,16 +106,6 @@ export function startCronJobs() {
       console.error('[CRON] Error cleaning up tokens:', error);
     }
   });
-
-  // Cleanup unverified users - Daily at 4 AM
-  // cron.schedule('0 4 * * *', async () => {
-  //   console.log('[CRON] Cleaning up unverified users...');
-  //   try {
-  //     await CleanupService.cleanupUnverifiedUsers();
-  //   } catch (error) {
-  //     console.error('[CRON] Error cleaning up unverified users:', error);
-  //   }
-  // });
 
   // Cleanup unverified users - Every 15 mins
   cron.schedule('*/15 * * * *', async () => {
@@ -146,9 +156,39 @@ export function startCronJobs() {
   console.log('  - Weekly digest: Monday 9:00 AM');
   console.log('  - Monthly digest: 1st day, 10:00 AM');
   console.log('  - Cleanup activity logs: 3:00 AM');
+  console.log('  - Sync view counts: every 15 minutes');
   console.log('  - Expired tokens: Every 6 hours');
-  console.log('  - Unverified users: Daily 4 AM');
+  console.log('  - Unverified users: Every 15 minutes');
   console.log('  - Inactive subscriptions: Sunday 5 AM');
   console.log('  - Old email logs: Monthly 1st 6 AM');
   console.log('  - Master cleanup: Saturday 3 AM');
+}
+
+// Manual sync function (can be called via API endpoint)
+export async function manualViewSync() {
+  console.log('🔄 Manual view count sync triggered...');
+
+  try {
+    const result = await syncViewCounts();
+
+    if (result) {
+      console.log('✅ Manual view count sync completed');
+      return { success: true, message: 'View counts synced successfully' };
+    } else {
+      console.warn('⚠️ Manual view count sync completed with errors');
+      return { success: false, message: 'Sync completed with errors' };
+    }
+  } catch (error) {
+    console.error('❌ Manual view count sync failed:', error);
+    if (error instanceof Error) {
+      return { success: false, message: 'Sync failed', error: error.message };
+    }
+
+    // Fallback for non-Error objects
+    return {
+      success: false,
+      message: 'Sync failed',
+      error: String(error),
+    };
+  }
 }

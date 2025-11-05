@@ -1,5 +1,5 @@
-import { io } from '#libs/socket';
 import { SOCKET_EVENTS } from '#sockets/events';
+import { io } from '#libs/socket';
 
 export class SocketService {
   /**

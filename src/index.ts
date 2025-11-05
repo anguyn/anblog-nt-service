@@ -1,7 +1,6 @@
 // src/index.ts
 import express from 'express';
 import http from 'http';
-import { Server } from 'socket.io';
 import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config';
@@ -12,8 +11,10 @@ import emailRoutes from '#routes/email.route';
 import mediaRoutes from '#routes/media.route';
 import healthRoutes from '#routes/health.route';
 import notificationRoutes from '#routes/notification.route';
+import postViewRoutes from '#routes/post-view.route';
 import socketRoutes from '#routes/socket.route';
 import monitoringRoutes from '#routes/monitoring.route';
+import { initializeSocket } from '#libs/socket';
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -39,9 +40,7 @@ const corsOptions = {
 };
 
 // Socket.IO setup with CORS
-const io = new Server(httpServer, {
-  cors: corsOptions,
-});
+const io = initializeSocket(httpServer);
 
 // Middleware
 app.use(cors(corsOptions));
@@ -65,6 +64,7 @@ if (isDevelopment) {
 app.use('/api/email', emailRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/post-view', postViewRoutes);
 app.use('/api/socket', socketRoutes);
 app.use('/api/monitoring', monitoringRoutes);
 app.use('/health', healthRoutes);
@@ -83,8 +83,8 @@ app.get('/', (req, res) => {
 io.on('connection', (socket) => {
   console.log('🔌 Client connected:', socket.id);
 
-  socket.on('disconnect', () => {
-    console.log('🔌 Client disconnected:', socket.id);
+  socket.on('disconnect', (reason) => {
+    console.log('Client disconnected:', socket.id, 'Reason:', reason);
   });
 
   socket.on('error', (error) => {
