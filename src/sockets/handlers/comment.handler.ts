@@ -160,72 +160,69 @@ export function setupCommentHandlers(socket: AuthenticatedSocket) {
   );
 
   // Like comment with throttle - REQUIRES AUTH
-  const likeComment = throttle(
-    requireAuth(async (socket: AuthenticatedSocket, payload: CommentLikePayload, callback) => {
-      const userId = socket.data.userId!;
-      const { commentId, postId } = payload;
+  const likeComment = requireAuth(async (socket: AuthenticatedSocket, payload: CommentLikePayload, callback) => {
+    const userId = socket.data.userId!;
+    const { commentId, postId } = payload;
 
-      if (!isInPostRoom(socket, postId)) {
-        return callback({ error: 'Must join post room first' });
-      }
+    if (!isInPostRoom(socket, postId)) {
+      return callback({ error: 'Must join post room first' });
+    }
 
-      try {
-        const result = await prisma.$transaction(async (tx) => {
-          // Check if already liked
-          const existingLike = await tx.commentLike.findUnique({
-            where: {
-              commentId_userId: { commentId, userId },
-            },
-          });
-
-          if (existingLike) {
-            return callback({ error: 'Already liked' });
-          }
-
-          // Create like
-          await tx.commentLike.create({
-            data: { commentId, userId },
-          });
-
-          // Update like count
-          const comment = await tx.comment.update({
-            where: { id: commentId },
-            data: { likeCount: { increment: 1 } },
-            include: {
-              author: { select: { id: true } },
-            },
-          });
-
-          return comment;
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        // Check if already liked
+        const existingLike = await tx.commentLike.findUnique({
+          where: {
+            commentId_userId: { commentId, userId },
+          },
         });
 
-        callback({ success: true, likeCount: result.likeCount });
-
-        // Broadcast
-        io.to(`post:${postId}`).emit(SOCKET_EVENTS.COMMENT_LIKED, {
-          commentId,
-          likeCount: result.likeCount,
-          userId,
-        });
-
-        // Notify comment author
-        if (result.authorId !== userId) {
-          await createNotification({
-            userId: result.authorId,
-            type: NotificationType.COMMENT_LIKE,
-            title: 'Someone liked your comment',
-            entityType: 'COMMENT',
-            entityId: commentId,
-            actorId: userId,
-          });
+        if (existingLike) {
+          return callback({ error: 'Already liked' });
         }
-      } catch (error) {
-        console.error('Error liking comment:', error);
-        callback({ error: 'Failed to like comment' });
+
+        // Create like
+        await tx.commentLike.create({
+          data: { commentId, userId },
+        });
+
+        // Update like count
+        const comment = await tx.comment.update({
+          where: { id: commentId },
+          data: { likeCount: { increment: 1 } },
+          include: {
+            author: { select: { id: true } },
+          },
+        });
+
+        return comment;
+      });
+
+      callback({ success: true, likeCount: result.likeCount });
+
+      // Broadcast
+      io.to(`post:${postId}`).emit(SOCKET_EVENTS.COMMENT_LIKED, {
+        commentId,
+        likeCount: result.likeCount,
+        userId,
+      });
+
+      // Notify comment author
+      if (result.authorId !== userId) {
+        await createNotification({
+          userId: result.authorId,
+          type: NotificationType.COMMENT_LIKE,
+          title: 'Someone liked your comment',
+          entityType: 'COMMENT',
+          entityId: commentId,
+          actorId: userId,
+        });
       }
-    }),
-    1000
-  ); // Throttle 1s
+    } catch (error) {
+      console.error('Error liking comment:', error);
+      callback({ error: 'Failed to like comment' });
+    }
+  });
 
   socket.on(SOCKET_EVENTS.COMMENT_LIKE, likeComment);
 
