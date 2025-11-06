@@ -159,7 +159,7 @@ export function setupCommentHandlers(socket: AuthenticatedSocket) {
     })
   );
 
-  // Like comment with throttle - REQUIRES AUTH
+  // Like comment - REQUIRES AUTH
   const likeComment = requireAuth(async (socket: AuthenticatedSocket, payload: CommentLikePayload, callback) => {
     const userId = socket.data.userId!;
     const { commentId, postId } = payload;
@@ -178,7 +178,7 @@ export function setupCommentHandlers(socket: AuthenticatedSocket) {
         });
 
         if (existingLike) {
-          return callback({ error: 'Already liked' });
+          throw new Error('ALREADY_LIKED');
         }
 
         // Create like
@@ -218,8 +218,13 @@ export function setupCommentHandlers(socket: AuthenticatedSocket) {
           actorId: userId,
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error liking comment:', error);
+
+      if (error.message === 'ALREADY_LIKED') {
+        return callback({ error: 'Already liked' });
+      }
+
       callback({ error: 'Failed to like comment' });
     }
   });
@@ -245,7 +250,7 @@ export function setupCommentHandlers(socket: AuthenticatedSocket) {
           });
 
           if (deleted.count === 0) {
-            return callback({ error: 'Not liked' });
+            throw new Error('NOT_LIKED');
           }
 
           // Update like count
@@ -265,11 +270,114 @@ export function setupCommentHandlers(socket: AuthenticatedSocket) {
           likeCount: result.likeCount,
           userId,
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error unliking comment:', error);
+
+        if (error.message === 'NOT_LIKED') {
+          return callback({ error: 'Not liked' });
+        }
+
         callback({ error: 'Failed to unlike comment' });
       }
     })
+  );
+
+  socket.on(
+    SOCKET_EVENTS.COMMENT_UPDATE,
+    requireAuth(
+      async (
+        socket: AuthenticatedSocket,
+        payload: { commentId: string; postId: string; content: string },
+        callback
+      ) => {
+        const userId = socket.data.userId!;
+        const { commentId, postId, content } = payload;
+
+        if (!isInPostRoom(socket, postId)) {
+          return callback({ error: 'Must join post room first' });
+        }
+
+        try {
+          // Validate content
+          if (!content?.trim()) {
+            return callback({ error: 'Content required' });
+          }
+
+          // Check ownership
+          const existingComment = await prisma.comment.findUnique({
+            where: { id: commentId },
+            select: { authorId: true, postId: true },
+          });
+
+          if (!existingComment) {
+            return callback({ error: 'Comment not found' });
+          }
+
+          if (existingComment.authorId !== userId) {
+            return callback({ error: 'Unauthorized' });
+          }
+
+          if (existingComment.postId !== postId) {
+            return callback({ error: 'Invalid post ID' });
+          }
+
+          // Update comment
+          const updatedComment = await prisma.comment.update({
+            where: { id: commentId },
+            data: {
+              content: content.trim(),
+              isEdited: true,
+            },
+            include: {
+              author: {
+                select: {
+                  id: true,
+                  name: true,
+                  username: true,
+                  image: true,
+                },
+              },
+              mentions: {
+                select: {
+                  id: true,
+                  userId: true,
+                  username: true,
+                  position: true,
+                },
+              },
+              stickers: {
+                include: {
+                  sticker: true,
+                },
+              },
+              parent: {
+                select: {
+                  id: true,
+                  authorId: true,
+                  author: {
+                    select: {
+                      username: true,
+                    },
+                  },
+                },
+              },
+            },
+          });
+
+          // Format response
+          const response = formatCommentResponse(updatedComment, userId);
+
+          // Send success callback
+          callback({ success: true, comment: response });
+
+          // Broadcast to post room (excluding sender)
+          socket.to(`post:${postId}`).emit(SOCKET_EVENTS.COMMENT_UPDATED, response);
+        } catch (error) {
+          console.error('Error updating comment:', error);
+          callback({ error: 'Failed to update comment' });
+        }
+      }
+    )
   );
 
   // Delete comment - REQUIRES AUTH
