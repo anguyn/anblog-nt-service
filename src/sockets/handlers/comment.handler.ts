@@ -328,23 +328,22 @@ export function setupCommentHandlers(socket: AuthenticatedSocket) {
   );
 
   // Typing indicators with throttle - REQUIRES AUTH
-  const emitTyping = throttle(
-    requireAuth((socket: AuthenticatedSocket, payload: CommentTypingPayload) => {
+  socket.on(
+    SOCKET_EVENTS.COMMENT_TYPING,
+    requireAuth(async (socket: AuthenticatedSocket, payload: CommentTypingPayload) => {
+      console.log('Test: ', socket.data);
       const userId = socket.data.userId!;
       socket.to(`post:${payload.postId}`).emit(SOCKET_EVENTS.COMMENT_TYPING, {
         userId,
         postId: payload.postId,
         parentId: payload.parentId,
       });
-    }),
-    2000
+    })
   );
-
-  socket.on(SOCKET_EVENTS.COMMENT_TYPING, emitTyping);
 
   socket.on(
     SOCKET_EVENTS.COMMENT_STOP_TYPING,
-    requireAuth((socket: AuthenticatedSocket, payload: CommentTypingPayload, callback) => {
+    requireAuth(async (socket: AuthenticatedSocket, payload: CommentTypingPayload, callback) => {
       const userId = socket.data.userId!;
 
       if (!isInPostRoom(socket, payload.postId)) {
